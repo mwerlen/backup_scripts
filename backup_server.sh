@@ -126,7 +126,7 @@ fi
 [ $SD_RSYNC_BACKUP = 1 ] && echo " - SD backup with rsync"
 [ $FLICKR_BACKUP = 1 ] && echo " - Pictures backup on flickR"
 [ $SEND_MAIL = 1 ] && echo " - Sending mail at the end to $MAIL"
-echo " - Cleaning up backup to kep at most $RETENTION_NUMBER backups"
+echo " - Cleaning up backup to keep at most $RETENTION_NUMBER backups"
 echo ""
 
 
@@ -167,7 +167,7 @@ if [ $DD_BACKUP = 1 ]; then
     echo "-> Server backup with dd..."
     
     DD_FOLDER=$CURRENT_FOLDER/server_dd
-    DD_COMMAND="dd if=/dev/sda of=${DD_FOLDER}/home_server_sda.img bs=1024"
+    DD_COMMAND="ddrescue /dev/sda ${DD_FOLDER}/home_server_sda.img ${DD_FOLDER}/home_server_sda.log"
 
     if [ $DRY_RUN = 1 ]; then
         echo "Would run \"$DD_COMMAND\""
