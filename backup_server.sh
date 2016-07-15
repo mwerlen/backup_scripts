@@ -167,7 +167,7 @@ if [ $DD_BACKUP = 1 ]; then
     echo "-> Server backup with dd..."
     
     DD_FOLDER=$CURRENT_FOLDER/server_dd
-    DD_COMMAND="ddrescue /dev/sda ${DD_FOLDER}/home_server_sda.img ${DD_FOLDER}/home_server_sda.log"
+    DD_COMMAND="ddrescue --quiet /dev/sda ${DD_FOLDER}/home_server_sda.img ${DD_FOLDER}/home_server_sda.log"
 
     if [ $DRY_RUN = 1 ]; then
         echo "Would run \"$DD_COMMAND\""
@@ -189,7 +189,7 @@ if [ $ROOT_RSYNC_BACKUP = 1 ]; then
     echo "-> Server backup with rsync..."
     
     ROOT_RSYNC_FOLDER=$CURRENT_FOLDER/server
-    ROOT_RSYNC_COMMAND="rsync --quiet --archive --acls --xattrs --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found"
+    ROOT_RSYNC_COMMAND="rsync --quiet --archive --acls --xattrs --ignore-errors --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found"
 
     if [ $DRY_RUN = 1 ]; then
         echo "Would run \"$ROOT_RSYNC_COMMAND\"";
