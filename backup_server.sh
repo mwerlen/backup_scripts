@@ -117,19 +117,62 @@ fi
 
 #####################################################
 #                                                   #
+# Logging                                           #
+#                                                   #
+#####################################################
+LOGFILE=""
+TEMPLOG=""
+log() {
+    LOG="$1"
+    if [ -z "$LOGFILE" ]; then
+        TEMPLOG+="${LOG}\n"
+        echo "$LOG"
+    else
+        if [ ! -z "$TEMPLOG" ]; then
+            echo -e "${TEMPLOG: : -1}" >> $LOGFILE
+            TEMPLOG=""
+        fi
+        echo "$LOG" | tee -a "$LOGFILE"
+    fi
+}
+
+
+runCommand() {
+    COMMAND=$1
+    FOLDER=$2
+    if [ $DRY_RUN = 1 ]; then
+        log "Would run \"$COMMAND\" in \"$FOLDER\""
+    else
+        mkdir $FOLDER
+        RETURN=""
+        set +e
+        eval "$COMMAND" 2>&1 | tee $LOGFILE;
+        set -e
+        RETURN=$?
+        if [ $RETURN -eq 0 ]
+        then
+            log "Backup command successfully completed"
+        else
+            log "Backup command ended with error code $RETURN"
+        fi
+    fi
+
+    
+}
+
+#####################################################
+#                                                   #
 # Operation summary                                 #
 #                                                   #
 #####################################################
-[ $DRY_RUN = 1 ] && echo "Operation scheduled in dry-run (no-op):" || echo "Operations scheduled:"
-[ $DD_BACKUP = 1 ] && echo " - Root FS backup with DD"
-[ $ROOT_RSYNC_BACKUP = 1 ] && echo " - Root FS backup with rsync"
-[ $SD_RSYNC_BACKUP = 1 ] && echo " - SD backup with rsync"
-[ $FLICKR_BACKUP = 1 ] && echo " - Pictures backup on flickR"
-[ $SEND_MAIL = 1 ] && echo " - Sending mail at the end to $MAIL"
-echo " - Cleaning up backup to keep at most $RETENTION_NUMBER backups"
-echo ""
-
-
+[ $DRY_RUN = 1 ] && log "Operation scheduled in dry-run (no-op):" || log "Operations scheduled:"
+[ $DD_BACKUP = 1 ] && log " - Root FS backup with DD"
+[ $ROOT_RSYNC_BACKUP = 1 ] && log " - Root FS backup with rsync"
+[ $SD_RSYNC_BACKUP = 1 ] && log " - SD backup with rsync"
+[ $FLICKR_BACKUP = 1 ] && log " - Pictures backup on flickR"
+[ $SEND_MAIL = 1 ] && log " - Sending mail at the end to $MAIL"
+log " - Cleaning up backup to keep at most $RETENTION_NUMBER backups"
+log ""
 
 #####################################################
 #                                                   #
@@ -143,12 +186,16 @@ while [ -d $CURRENT_FOLDER ]; do
     CURRENT_FOLDER=$BACKUP_GLOBAL_FOLDER/$BACKUP_NAME$CURRENT_DATE-${COUNTER};
     ((COUNTER++));
 done
+LOGFILELOCATION="$CURRENT_FOLDER/backup.log"
 if [ $DRY_RUN = 1 ]; then
-    echo "Would create a new backup folder : $CURRENT_FOLDER"
+    log "Would create a new backup folder : $CURRENT_FOLDER"
+    log "Would create a new log file : $LOGFILELOCATION"
 else
-    echo "Creating a new backup folder : $CURRENT_FOLDER"
+    log "Creating a new backup folder : $CURRENT_FOLDER"
     mkdir $CURRENT_FOLDER
     touch "$CURRENT_FOLDER/XX-Backup from $(date '+%A, %d %B %Y, %T')"
+    LOGFILE="$LOGFILELOCATION"
+    log "Creating a new log file : $LOGFILELOCATION"
 fi
 
 #####################################################
@@ -163,21 +210,17 @@ GLOBAL_START=$(date +%s)
 ###########
 if [ $DD_BACKUP = 1 ]; then
     START=$(date +%s)
-    echo "--------------------------------"
-    echo "-> Server backup with dd..."
+    log ""
+    log "--------------------------------"
+    log "-> Server backup with dd..."
     
     DD_FOLDER=$CURRENT_FOLDER/server_dd
     DD_COMMAND="ddrescue --quiet /dev/sda ${DD_FOLDER}/home_server_sda.img ${DD_FOLDER}/home_server_sda.log"
 
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$DD_COMMAND\""
-    else
-        mkdir $DD_FOLDER
-        eval "$DD_COMMAND";
-    fi
+    runCommand "$DD_COMMAND" "$DD_FOLDER"
 
     FINISH=$(date +%s)
-    echo "DD backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+    log "DD backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
 fi
 
 ############
@@ -185,21 +228,17 @@ fi
 ############
 if [ $ROOT_RSYNC_BACKUP = 1 ]; then
     START=$(date +%s)
-    echo "--------------------------------"
-    echo "-> Server backup with rsync..."
+    log ""
+    log "--------------------------------"
+    log "-> Server backup with rsync..."
     
     ROOT_RSYNC_FOLDER=$CURRENT_FOLDER/server
     ROOT_RSYNC_COMMAND="rsync --quiet --archive --acls --xattrs --ignore-errors --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found"
 
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$ROOT_RSYNC_COMMAND\"";
-    else
-        mkdir $ROOT_RSYNC_FOLDER
-        eval "$ROOT_RSYNC_COMMAND";
-    fi
-    
+    runCommand "$ROOT_RSYNC_COMMAND" "$ROOT_RSYNC_FOLDER"
+
     FINISH=$(date +%s)
-    echo "Root backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+    log "Root backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
 fi
 
 ##########
@@ -207,21 +246,17 @@ fi
 ##########
 if [ $SD_RSYNC_BACKUP = 1 ]; then
     START=$(date +%s)
-    echo "--------------------------------"
-    echo "-> SD backup with rsync..."
+    log ""
+    log "--------------------------------"
+    log "-> SD backup with rsync..."
 
     SD_RSYNC_FOLDER=$CURRENT_FOLDER/sd
     SD_RSYNC_COMMAND="rsync --quiet --archive --acls --xattrs --verbose /mnt/sd ${SD_RSYNC_FOLDER} --exclude /lost+found"
 
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$SD_RSYNC_COMMAND\""
-    else
-        mkdir $SD_RSYNC_FOLDER
-        eval "$SD_RSYNC_COMMAND";
-    fi
-   
+    runCommand "$SD_RSYNC_COMMAND" "$SD_RSYNC_FOLDER";
+
     FINISH=$(date +%s)
-    echo "SD backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+    log "SD backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
 fi
 
 ##############
@@ -230,30 +265,32 @@ fi
 
 if [ $FLICKR_BACKUP = 1 ]; then
     START=$(date +%s) 
-    echo "--------------------------------"
-    echo "-> FlickR backup"
+    log ""
+    log "--------------------------------"
+    log "-> FlickR backup"
 
     if [ $DRY_RUN = 1 ]; then
-        echo "Would run long flickrUpload script..."
+        log "Would run long flickrUpload script..."
         FINISH=$(date +%s)
     else
         cd /usr/local/src/flickr_uploadr/
         # reset log
-        echo "Lancement par le script backup_photos_on_flickr.sh" > /var/log/uploadr.log
-        python -u /usr/local/src/flickr_uploadr/uploadr.py
+        echo "Lancement par le script backup_server.sh" > /var/log/uploadr.log
+        set +e
+        python -u /usr/local/src/flickr_uploadr/uploadr.py 2>&1 | tee $LOGFILE
+        set -e
         FINISH=$(date +%s)
-        echo "Flickr backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s" >> /var/log/uploadr.log
     fi
    
-    echo "Flickr backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s" | tee -a /var/log/uploadr.log
+    log "Flickr backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s" | tee -a /var/log/uploadr.log
 fi
 
 
 # Final Log
 GLOBAL_FINISH=$(date +%s)
-echo ""
-echo ""
-echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOBAL_FINISH-$GLOBAL_START)/60)%60 ))m $(( ($GLOBAL_FINISH-$GLOBAL_START)%60 ))s"
+log ""
+log ""
+log "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOBAL_FINISH-$GLOBAL_START)/60)%60 ))m $(( ($GLOBAL_FINISH-$GLOBAL_START)%60 ))s"
 
 #####################################################
 #                                                   #
@@ -262,10 +299,10 @@ echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOB
 #####################################################
 if [ $SEND_MAIL = 1 ]; then
     if [ $DRY_RUN = 1 ]; then
-        echo "Would send mail to $MAIL"
+        log "Would send mail to $MAIL"
     else
-        echo "Sending mail to $MAIL"
-        echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOBAL_FINISH-$GLOBAL_START)/60)%60 ))m $(( ($GLOBAL_FINISH-$GLOBAL_START)%60 ))s" | mail -s "Server backup" $MAIL
+        log "Sending mail to $MAIL"
+        echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOBAL_FINISH-$GLOBAL_START)/60)%60 ))m $(( ($GLOBAL_FINISH-$GLOBAL_START)%60 ))s" | mail -s "Server backup" -a $LOGFILE $MAIL
     fi
 fi
 
@@ -276,9 +313,9 @@ fi
 #####################################################
 
 if [ $DRY_RUN = 1 ]; then
-    echo "Would remove old backup"
+    log "Would remove old backup"
 else
-    echo "Removing old backups"
+    log "Removing old backups"
     \ls -1Ad $BACKUP_GLOBAL_FOLDER/$BACKUP_NAME* | sort -r | tail -n +$(expr $RETENTION_NUMBER + 1) | xargs -I dirs rm -r dirs
 fi
 
