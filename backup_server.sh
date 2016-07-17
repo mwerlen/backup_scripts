@@ -146,7 +146,7 @@ runCommand() {
         mkdir $FOLDER
         RETURN=""
         set +e
-        eval "$COMMAND" 2>&1 | tee $LOGFILE;
+        eval "$COMMAND" 2>&1 | tee -a $LOGFILE;
         set -e
         RETURN=$?
         if [ $RETURN -eq 0 ]
@@ -277,7 +277,7 @@ if [ $FLICKR_BACKUP = 1 ]; then
         # reset log
         echo "Lancement par le script backup_server.sh" > /var/log/uploadr.log
         set +e
-        python -u /usr/local/src/flickr_uploadr/uploadr.py 2>&1 | tee $LOGFILE
+        python -u /usr/local/src/flickr_uploadr/uploadr.py 2>&1 | tee -a $LOGFILE
         set -e
         FINISH=$(date +%s)
     fi
