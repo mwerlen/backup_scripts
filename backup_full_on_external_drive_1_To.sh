@@ -20,7 +20,7 @@ FINISH=$(date +%s)
 echo "Backup full on external drive total time: $(( ($FINISH-$START) / 60 )) minutes, $(( ($FINISH-$START) % 60 )) seconds"
 echo "Backup full on external drive total time: $(( ($FINISH-$START) / 60 )) minutes, $(( ($FINISH-$START) % 60 )) seconds" | mail -s "Backup full on external drive" root@server.werlen.fr
 
-rm /mnt/backup_full/XX-Backup*
+rm -f /mnt/backup_full/XX-Backup*
 touch /mnt/backup_full/"XX-Backup from $(date '+%A, %d %B %Y, %T')"
 
 umount /mnt/backup_full
