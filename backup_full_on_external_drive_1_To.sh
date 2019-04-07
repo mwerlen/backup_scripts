@@ -8,11 +8,18 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+if test -z "$STY"
+then
+    echo "You are not running this backup in a GNU screen. Are you sure ?"
+    read -p "Press [Enter] key to start backup anyway..."
+fi
+
 mkdir -p /mnt/backup_full
 cryptsetup luksOpen /dev/disk/by-uuid/bdc2698b-582c-4313-8482-563b9c9b52a6 backup_full
 mount /dev/mapper/backup_full /mnt/backup_full/
 
 echo "Disk mounted"
+echo "Starting backup. You will receive a mail when backup is done."
 
 START=$(date +%s)
 rsync --archive --delete-before --progress --safe-links --links --one-file-system /media/disk/* /mnt/backup_full/ --exclude lost+found
