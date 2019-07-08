@@ -8,9 +8,9 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-if test -z "$STY"
-then
-    echo "You are not running this backup in a GNU screen. Are you sure ?"
+if [[ -z "${STY:-}" ]]; then
+    echo "You are not running this backup in a GNU screen."
+    echo "You perhaps forget to run with sudo -E to keep your env variables"
     read -p "Press [Enter] key to start backup anyway..."
 fi
 
