@@ -22,7 +22,7 @@ echo "Disk mounted"
 echo "Starting backup. You will receive a mail when backup is done."
 
 START=$(date +%s)
-rsync-no-vanished --archive --delete-before --progress --safe-links --links --one-file-system /media/disk/* /mnt/backup_full/ --exclude lost+found --exclude tempDownloads
+rsync-no-vanished --archive --delete-before --progress --safe-links --links --one-file-system --exclude "lost+found" --exclude "tempDownloads" /media/disk/* /mnt/backup_full/
 FINISH=$(date +%s)
 echo "Backup full on external drive total time: $(( ($FINISH-$START) / 60 )) minutes, $(( ($FINISH-$START) % 60 )) seconds"
 echo "Backup full on external drive total time: $(( ($FINISH-$START) / 60 )) minutes, $(( ($FINISH-$START) % 60 )) seconds" | mail -s "Backup full on external drive" root@server.werlen.fr
