@@ -1,7 +1,21 @@
 #!/bin/sh
 
 START=$(date +%s)
-rsync --archive --progress --safe-links --links /media/disk/* /mnt/backup/ --exclude downloads --exclude lost+found --exclude movies --exclude saveJean --exclude series --exclude tempDownloads
+rsync-no-vanished \
+    --archive \
+    --delete --delete-before --delete-excluded \
+    --progress \
+    --safe-links --links \
+    --one-file-system \
+    --exclude "lost+found" \
+    --exclude "downloads" \
+    --exclude "movies" \
+    --exclude "saveJean" \
+    --exclude "saveMax" \
+    --exclude "series" \
+    --exclude "tempDownloads" \
+    --exclude "torrents" \
+    /media/disk/* /mnt/backup/
 FINISH=$(date +%s)
 echo "Backup on external drive total time: $(( ($FINISH-$START) / 60 )) minutes, $(( ($FINISH-$START) % 60 )) seconds"
 echo "Backup on external drive total time: $(( ($FINISH-$START) / 60 )) minutes, $(( ($FINISH-$START) % 60 )) seconds" | mail -s "Backup on external drive" root@server.werlen.fr
