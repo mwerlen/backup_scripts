@@ -28,6 +28,7 @@ DD_BACKUP=0
 ROOT_RSYNC_BACKUP=0
 SD_RSYNC_BACKUP=0
 FLICKR_BACKUP=0
+KODI_BACKUP=0
 MAIL=root@server.werlen.fr
 
 #####################################################
@@ -45,6 +46,7 @@ usage() {
     echo "      -r          Backup root system with rsync"
     echo "      -s          Backup SD card with rsync"
     echo "      -f          Backup pictures on FlickR"
+    echo "      -k          Backup kodi"
     echo "      -n <number> Keep <number> backups (default: 5)"
 }
 
@@ -54,7 +56,7 @@ usage() {
 # Options processing                                #
 #                                                   #
 #####################################################
-while getopts ":htm:drsfn:" opt; do
+while getopts ":htm:drsfkn:" opt; do
     case $opt in
         h)
             usage
@@ -78,6 +80,9 @@ while getopts ":htm:drsfn:" opt; do
             ;;
         f)
             FLICKR_BACKUP=1
+            ;;
+        k)
+            KODI_BACKUP=1
             ;;
         n)
             if [[ $OPTARG == +([0-9]) ]]; then
@@ -125,6 +130,7 @@ fi
 [ $ROOT_RSYNC_BACKUP = 1 ] && echo " - Root FS backup with rsync"
 [ $SD_RSYNC_BACKUP = 1 ] && echo " - SD backup with rsync"
 [ $FLICKR_BACKUP = 1 ] && echo " - Pictures backup on flickR"
+[ $KODI_BACKUP = 1 ] && echo " - Kodi backups sync"
 [ $SEND_MAIL = 1 ] && echo " - Sending mail at the end to $MAIL"
 echo " - Cleaning up backup to kep at most $RETENTION_NUMBER backups"
 echo ""
@@ -248,6 +254,28 @@ if [ $FLICKR_BACKUP = 1 ]; then
     echo "Flickr backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s" | tee -a /var/log/uploadr.log
 fi
 
+#############
+# Kodi Backup
+#############
+
+if [ $KODI_BACKUP = 1 ]; then
+    START=$(date +%s)
+    echo "--------------------------------"
+    echo "-> Kodi backup"
+
+    KODI_FOLDER=$CURRENT_FOLDER/kodi_backup
+    KODI_CP_COMMAND="mv /home/kodi/backups/* ${KODI_FOLDER}"
+
+    if [ $DRY_RUN = 1 ]; then
+        echo "Would run \"$KODI_CP_COMMAND\""
+    else
+        mkdir $KODI_FOLDER
+        eval "$KODI_CP_COMMAND";
+    fi
+
+    FINISH=$(date +%s)
+    echo "Kodi backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+fi
 
 # Final Log
 GLOBAL_FINISH=$(date +%s)
