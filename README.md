@@ -14,7 +14,6 @@ backup_server
           -d          Backup root system with DD
           -r          Backup root system with rsync
           -s          Backup SD card with rsync
-          -f          Backup pictures on FlickR
           -n <number> Keep <number> backups (default: 5)
 
 backup_on_external_disk.sh
