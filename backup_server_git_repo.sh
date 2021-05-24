@@ -68,9 +68,9 @@ do
     echo "${name}" >> "${LOG_FILE}"
     
     if [[ -d "${dir}/${name}.git" ]]; then
-        git --git-dir="${dir}/${name}.git" remote update --prune >> "${LOG_FILE}"
+        git --git-dir="${dir}/${name}.git" remote update --prune >> "${LOG_FILE}" 2>&1
     else
-        git --git-dir="${dir}/${name}.git" clone --mirror "${url}" "${dir}/${name}.git" >> "${LOG_FILE}"
+        git --git-dir="${dir}/${name}.git" clone --mirror "${url}" "${dir}/${name}.git" >> "${LOG_FILE}" 2>&1
     fi
 
     echo "" >> "${LOG_FILE}"
