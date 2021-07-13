@@ -68,6 +68,11 @@ do
     echo "${name}" >> "${LOG_FILE}"
     
     if [[ -d "${dir}/${name}.git" ]]; then
+        old_url=$(git --git-dir="${dir}/${name}.git" remote -v | grep -e 'origin.*(fetch)' | grep -o 'http.*\.git')
+        if [[ "${old_url}" != ${url} ]]; then
+            echo "Mise à jour de l'URL (changement de token)" >> "${LOG_FILE}"
+            git --git-dir="${dir}/${name}.git" remote set-url origin ${url} >> "${LOG_FILE}" 2>&1
+        fi
         git --git-dir="${dir}/${name}.git" remote update --prune >> "${LOG_FILE}" 2>&1
     else
         git --git-dir="${dir}/${name}.git" clone --mirror "${url}" "${dir}/${name}.git" >> "${LOG_FILE}" 2>&1
