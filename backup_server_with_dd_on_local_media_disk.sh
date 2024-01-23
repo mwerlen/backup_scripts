@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DATE=`date +%Y%m%d`
-CMD="dd if=/dev/sda of=/media/disk/saveMax/server_dd/home_server_sda-${DATE}.img bs=1024"
+CMD="dd if=/dev/sda1 of=/media/disk/saveMax/server_dd/home_server_sda1-${DATE}.img bs=1024"
 echo $CMD
 
 START=$(date +%s)
