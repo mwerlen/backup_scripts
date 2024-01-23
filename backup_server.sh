@@ -189,7 +189,7 @@ if [ $ROOT_RSYNC_BACKUP = 1 ]; then
     echo "-> Server backup with rsync..."
     
     ROOT_RSYNC_FOLDER=$CURRENT_FOLDER/server
-    ROOT_RSYNC_COMMAND="rsync --quiet --archive --acls --xattrs --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found --exclude /var/lib/lxcfs/cgroup --exclude /var/lib/lxcfs/proc"
+    ROOT_RSYNC_COMMAND="/usr/local/bin/rsync-no-vanished --quiet --archive --acls --xattrs --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found --exclude /var/lib/lxcfs/cgroup --exclude /var/lib/lxcfs/proc"
 
     if [ $DRY_RUN = 1 ]; then
         echo "Would run \"$ROOT_RSYNC_COMMAND\"";
@@ -211,7 +211,7 @@ if [ $SD_RSYNC_BACKUP = 1 ]; then
     echo "-> SD backup with rsync..."
 
     SD_RSYNC_FOLDER=$CURRENT_FOLDER/sd
-    SD_RSYNC_COMMAND="rsync --quiet --archive --acls --xattrs --verbose /mnt/sd ${SD_RSYNC_FOLDER} --exclude /lost+found"
+    SD_RSYNC_COMMAND="/usr/local/bin/rsync-no-vanished --quiet --archive --acls --xattrs --verbose /mnt/sd ${SD_RSYNC_FOLDER} --exclude /lost+found"
 
     if [ $DRY_RUN = 1 ]; then
         echo "Would run \"$SD_RSYNC_COMMAND\""
