@@ -35,7 +35,8 @@ ssh -S $CTRL_SOCKET -O check $USER@$SERVER
 echo "Starting rsync"
 START=$(date +%s)
 
-sudo rsync --port=$PORT \
+sudo RSYNC_PASSWORD="${RSYNC_PASSWORD}" rsync \
+    --port=$PORT \
     --recursive \
     --times \
     --specials \
@@ -44,6 +45,8 @@ sudo rsync --port=$PORT \
     --safe-links \
     --links \
     --one-file-system \
+    --delete-excluded \
+    --delete-during \
     --exclude /dev/ \
     --exclude /proc/ \
     --exclude /sys/ \
@@ -53,17 +56,25 @@ sudo rsync --port=$PORT \
     --exclude /media/ \
     --exclude lost+found \
     --exclude /home/mwerlen/Music \
+    --exclude /home/mwerlen/Musique \
     --exclude /home/mwerlen/Videos \
+    --exclude /home/mwerlen/Vidéos \
     --exclude /home/mwerlen/projects \
     --exclude /home/mwerlen/.PlayOnLinux \
     --exclude /home/mwerlen/Dropbox \
+    --exclude /home/mwerlen/.dropbox \
     --exclude /home/mwerlen/VirtualBox\ VMs/ \
     --exclude /home/mwerlen/.cache \
     --exclude /home/mwerlen/.npm \
     --exclude /home/mwerlen/.m2/repository/  \
-    --exclude /home/mwerlen/Android/Sdk/extras/google/m2repository \
+    --exclude /home/mwerlen/Android/ \
+    --exclude /home/mwerlen/.local/share/JetBrains \
     --exclude /home/mwerlen/.local/share/Trash \
-    --eclude /var/lib/docker/aufs \
+    --exclude /home/mwerlen/.mozilla/firefox \
+    --exclude /var/lib/docker \
+    --exclude /var/cache \
+    --exclude /var/backups \
+    --exclude /var/log/journal \
     /* \
     "${USER}@localhost::${RSYNC_SHARE}/${DIRECTORY}"
 
