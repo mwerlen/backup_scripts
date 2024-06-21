@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2004
 # strict mode on
 set -euo pipefail
 IFS=$'\n\t'
@@ -19,16 +20,15 @@ IFS=$'\n\t'
 #                                                   #
 #####################################################
 RETENTION_NUMBER=5
-BACKUP_GLOBAL_FOLDER=/media/disk/saveMax/server_backup
-SOURCE=/
-BACKUP_NAME=backup_on_
+INTERNAL_BACKUP_DISK_MOUNT_DIR="/mnt/internal_backup"
+BACKUP_GLOBAL_FOLDER="${INTERNAL_BACKUP_DISK_MOUNT_DIR}/saveMax/server_backup"
+BACKUP_NAME="backup_on_"
 DRY_RUN=0
 SEND_MAIL=0
-DD_BACKUP=0
+COPY_SSD_TO_HDD=0
 ROOT_RSYNC_BACKUP=0
-SD_RSYNC_BACKUP=0
 KODI_BACKUP=0
-MAIL=root@server.werlen.fr
+MAIL="root@server.werlen.fr"
 
 #####################################################
 #                                                   #
@@ -41,9 +41,8 @@ usage() {
     echo "      -h          View this help message"
     echo "      -t          Test run, no backup made"
     echo "      -m <mail>   Send mail to <mail> at the end"
-    echo "      -d          Backup root system with DD"
+    echo "      -c          Copy SSD media folder to internal HDD"
     echo "      -r          Backup root system with rsync"
-    echo "      -s          Backup SD card with rsync"
     echo "      -k          Backup kodi"
     echo "      -n <number> Keep <number> backups (default: 5)"
 }
@@ -54,7 +53,7 @@ usage() {
 # Options processing                                #
 #                                                   #
 #####################################################
-while getopts ":htm:drskn:" opt; do
+while getopts ":htm:crkn:" opt; do
     case $opt in
         h)
             usage
@@ -67,14 +66,11 @@ while getopts ":htm:drskn:" opt; do
             SEND_MAIL=1
             MAIL="$OPTARG"
             ;;
-        d)
-            DD_BACKUP=1
+        c)
+            COPY_SSD_TO_HDD=1
             ;;
         r)
             ROOT_RSYNC_BACKUP=1
-            ;;
-        s)
-            SD_RSYNC_BACKUP=1
             ;;
         k)
             KODI_BACKUP=1
@@ -100,6 +96,16 @@ while getopts ":htm:drskn:" opt; do
     esac
 done
 
+function mount_disk {
+    echo "Montage du disque de sauvegarde interne"
+    # d950c733-e582-40fb-930f-602f82c5d0e4 -> ../../sdb1 (le HDD interne)
+    mount /dev/disk/by-uuid/d950c733-e582-40fb-930f-602f82c5d0e4 "${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
+}
+
+function unmount_disk {
+    echo "Démontage du disque de sauvegarde interne"
+    umount "${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
+}
 
 #####################################################
 #                                                   #
@@ -110,7 +116,17 @@ if [[ $EUID -ne 0 ]]; then
     echo "You must be root to launch backup script" 2>&1
     exit 1
 fi
-if [ ! -d "$BACKUP_GLOBAL_FOLDER" ]; then
+if [[ ! -d "${INTERNAL_BACKUP_DISK_MOUNT_DIR}" ]]; then
+    echo "Mount point for internal backup disk is missing. Creating it"
+    mkdir -p "${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
+fi
+
+# Montage du disque de sauvegarde interne
+trap unmount_disk SIGINT
+trap unmount_disk EXIT
+mount_disk
+
+if [ ! -d "${BACKUP_GLOBAL_FOLDER}" ]; then
     echo "Backup folder ($BACKUP_GLOBAL_FOLDER) is not accessible"
     exit 2
 fi
@@ -121,9 +137,7 @@ fi
 #                                                   #
 #####################################################
 [ $DRY_RUN = 1 ] && echo "Operation scheduled in dry-run (no-op):" || echo "Operations scheduled:"
-[ $DD_BACKUP = 1 ] && echo " - Root FS backup with DD"
 [ $ROOT_RSYNC_BACKUP = 1 ] && echo " - Root FS backup with rsync"
-[ $SD_RSYNC_BACKUP = 1 ] && echo " - SD backup with rsync"
 [ $KODI_BACKUP = 1 ] && echo " - Kodi backups sync"
 [ $SEND_MAIL = 1 ] && echo " - Sending mail at the end to $MAIL"
 echo " - Cleaning up backup to kep at most $RETENTION_NUMBER backups"
@@ -138,17 +152,17 @@ echo ""
 #####################################################
 CURRENT_DATE=$(date -Iminutes)
 CURRENT_FOLDER=$BACKUP_GLOBAL_FOLDER/$BACKUP_NAME$CURRENT_DATE
-while [ -d $CURRENT_FOLDER ]; do
+while [ -d "${CURRENT_FOLDER}" ]; do
     COUNTER=${COUNTER-2};
-    CURRENT_FOLDER=$BACKUP_GLOBAL_FOLDER/$BACKUP_NAME$CURRENT_DATE-${COUNTER};
+    CURRENT_FOLDER="${BACKUP_GLOBAL_FOLDER}/${BACKUP_NAME}${CURRENT_DATE}-${COUNTER}";
     ((COUNTER++));
 done
-if [ $DRY_RUN = 1 ]; then
-    echo "Would create a new backup folder : $CURRENT_FOLDER"
+if [ "${DRY_RUN}" = 1 ]; then
+    echo "Would create a new backup folder : ${CURRENT_FOLDER}"
 else
-    echo "Creating a new backup folder : $CURRENT_FOLDER"
-    mkdir $CURRENT_FOLDER
-    touch "$CURRENT_FOLDER/XX-Backup from $(date '+%A, %d %B %Y, %T')"
+    echo "Creating a new backup folder : ${CURRENT_FOLDER}"
+    mkdir "${CURRENT_FOLDER}"
+    touch "${CURRENT_FOLDER}/XX-Backup from $(date '+%A, %d %B %Y, %T')"
 fi
 
 #####################################################
@@ -156,99 +170,91 @@ fi
 # Backups                                           #
 #                                                   #
 #####################################################
-GLOBAL_START=$(date +%s)
+GLOBAL_START="$(date +%s)"
 
-###########
-# DD Backup
-###########
-if [ $DD_BACKUP = 1 ]; then
-    START=$(date +%s)
+#######################################
+# Copy SSH media folder to internal HDD
+#######################################
+if [ "${COPY_SSD_TO_HDD}" = 1 ]; then
+    START="$(date +%s)"
     echo "--------------------------------"
-    echo "-> Server backup with dd..."
-    
-    DD_FOLDER=$CURRENT_FOLDER/server_dd
-    DD_COMMAND="dd if=/dev/sda of=${DD_FOLDER}/home_server_sda.img bs=1024"
+    echo "-> Copy media folder from SSH to internal HDD with rsync..."
 
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$DD_COMMAND\""
+    SRC_RSYNC_FOLDER="/media/disk/"
+    DEST_RSYNC_FOLDER="${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
+    COPY_RSYNC_COMMAND="/usr/local/bin/rsync-no-vanished \
+        --recursive \
+        --one-file-system \
+        --links --hard-links \
+        --perms --executability \
+        --times --atimes --open-noatime \
+        --group --owner \
+        --acls --xattrs \
+        --delete-before \
+        --no-compress \
+        --verbose \
+        --exclude 'saveMax/server_backup' \
+        --exclude 'lost+found' \
+        ${SRC_RSYNC_FOLDER} \
+        ${DEST_RSYNC_FOLDER}"
+
+    if [ "${DRY_RUN}" = 1 ]; then
+        echo "Would run \"${COPY_RSYNC_COMMAND}\""
     else
-        mkdir $DD_FOLDER
-        eval "$DD_COMMAND";
+        eval "${COPY_RSYNC_COMMAND}";
     fi
-
-    FINISH=$(date +%s)
-    echo "DD backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+   
+    FINISH="$(date +%s)"
+    echo "SD backup total time: $(( (${FINISH}-${START})/3600 ))h $(( ((${FINISH}-${START})/60)%60 ))m $(( (${FINISH}-${START})%60 ))s"
 fi
 
 ############
 # ROOT Rsync
 ############
-if [ $ROOT_RSYNC_BACKUP = 1 ]; then
-    START=$(date +%s)
+if [ "${ROOT_RSYNC_BACKUP}" = 1 ]; then
+    START="$(date +%s)"
     echo "--------------------------------"
     echo "-> Server backup with rsync..."
     
-    ROOT_RSYNC_FOLDER=$CURRENT_FOLDER/server
+    ROOT_RSYNC_FOLDER="${CURRENT_FOLDER}/server"
     ROOT_RSYNC_COMMAND="/usr/local/bin/rsync-no-vanished --quiet --archive --acls --xattrs --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found --exclude /var/lib/lxcfs/cgroup --exclude /var/lib/lxcfs/proc"
 
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$ROOT_RSYNC_COMMAND\"";
+    if [ "${DRY_RUN}" = 1 ]; then
+        echo "Would run \"${ROOT_RSYNC_COMMAND}\"";
     else
-        mkdir $ROOT_RSYNC_FOLDER
-        eval "$ROOT_RSYNC_COMMAND";
+        mkdir "${ROOT_RSYNC_FOLDER}"
+        eval "${ROOT_RSYNC_COMMAND}";
     fi
     
-    FINISH=$(date +%s)
-    echo "Root backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
-fi
-
-##########
-# SD Rsync
-##########
-if [ $SD_RSYNC_BACKUP = 1 ]; then
-    START=$(date +%s)
-    echo "--------------------------------"
-    echo "-> SD backup with rsync..."
-
-    SD_RSYNC_FOLDER=$CURRENT_FOLDER/sd
-    SD_RSYNC_COMMAND="/usr/local/bin/rsync-no-vanished --quiet --archive --acls --xattrs --verbose /mnt/sd ${SD_RSYNC_FOLDER} --exclude /lost+found"
-
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$SD_RSYNC_COMMAND\""
-    else
-        mkdir $SD_RSYNC_FOLDER
-        eval "$SD_RSYNC_COMMAND";
-    fi
-   
-    FINISH=$(date +%s)
-    echo "SD backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+    FINISH="$(date +%s)"
+    echo "Root backup total time: $(( (${FINISH}-${START})/3600 ))h $(( ((${FINISH}-${START})/60)%60 ))m $(( (${FINISH}-${START})%60 ))s"
 fi
 
 #############
 # Kodi Backup
 #############
 
-if [ $KODI_BACKUP = 1 ]; then
-    START=$(date +%s)
+if [ "${KODI_BACKUP}" = 1 ]; then
+    START="$(date +%s)"
     echo "--------------------------------"
     echo "-> Kodi backup"
 
-    KODI_FOLDER=$CURRENT_FOLDER/kodi_backup
+    KODI_FOLDER="${CURRENT_FOLDER}/kodi_backup"
     KODI_CP_COMMAND="mv /home/kodi/backups/* ${KODI_FOLDER}"
 
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would run \"$KODI_CP_COMMAND\""
+    if [ "${DRY_RUN}" = 1 ]; then
+        echo "Would run \"${KODI_CP_COMMAND}\""
     else
-        mkdir $KODI_FOLDER
+        mkdir "${KODI_FOLDER}"
         eval "$KODI_CP_COMMAND";
     fi
 
-    FINISH=$(date +%s)
-    echo "Kodi backup total time: $(( ($FINISH-$START)/3600 ))h $(( (($FINISH-$START)/60)%60 ))m $(( ($FINISH-$START)%60 ))s"
+    FINISH="$(date +%s)"
+    echo "Kodi backup total time: $(( (${FINISH}-${START})/3600 ))h $(( ((${FINISH}-${START})/60)%60 ))m $(( (${FINISH}-${START})%60 ))s"
 fi
 
 # Final Log
-GLOBAL_FINISH=$(date +%s)
+GLOBAL_FINISH="$(date +%s)"
 echo ""
 echo ""
 echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOBAL_FINISH-$GLOBAL_START)/60)%60 ))m $(( ($GLOBAL_FINISH-$GLOBAL_START)%60 ))s"
@@ -258,12 +264,12 @@ echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOB
 # Mail                                              #
 #                                                   #
 #####################################################
-if [ $SEND_MAIL = 1 ]; then
-    if [ $DRY_RUN = 1 ]; then
-        echo "Would send mail to $MAIL"
+if [ "${SEND_MAIL}" = 1 ]; then
+    if [ "${DRY_RUN}" = 1 ]; then
+        echo "Would send mail to ${MAIL}"
     else
-        echo "Sending mail to $MAIL"
-        echo "Total backup time: $(( ($GLOBAL_FINISH-$GLOBAL_START)/3600 ))h $(( (($GLOBAL_FINISH-$GLOBAL_START)/60)%60 ))m $(( ($GLOBAL_FINISH-$GLOBAL_START)%60 ))s" | mail -s "Server backup" $MAIL
+        echo "Sending mail to ${MAIL}"
+        echo "Total backup time: $(( (${GLOBAL_FINISH}-${GLOBAL_START})/3600 ))h $(( ((${GLOBAL_FINISH}-${GLOBAL_START})/60)%60 ))m $(( (${GLOBAL_FINISH}-${GLOBAL_START})%60 ))s" | mail -s "Server backup" "${MAIL}"
     fi
 fi
 
@@ -273,10 +279,10 @@ fi
 #                                                   #
 #####################################################
 
-if [ $DRY_RUN = 1 ]; then
+if [ "${DRY_RUN}" = 1 ]; then
     echo "Would remove old backup"
 else
     echo "Removing old backups"
-    \ls -1Ad $BACKUP_GLOBAL_FOLDER/$BACKUP_NAME* | sort -r | tail -n +$(expr $RETENTION_NUMBER + 1) | xargs -I dirs rm -r dirs
+    find "${BACKUP_GLOBAL_FOLDER}" -maxdepth 1 -name "${BACKUP_NAME}"'*' | sort -r | tail -n +$(( "${RETENTION_NUMBER}" + 1)) | xargs -I dirs rm -r dirs
 fi
 
