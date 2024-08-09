@@ -27,7 +27,6 @@ DRY_RUN=0
 SEND_MAIL=0
 COPY_SSD_TO_HDD=0
 ROOT_RSYNC_BACKUP=0
-KODI_BACKUP=0
 MAIL="root@server.werlen.fr"
 
 #####################################################
@@ -43,7 +42,6 @@ usage() {
     echo "      -m <mail>   Send mail to <mail> at the end"
     echo "      -c          Copy SSD media folder to internal HDD"
     echo "      -r          Backup root system with rsync"
-    echo "      -k          Backup kodi"
     echo "      -n <number> Keep <number> backups (default: 5)"
 }
 
@@ -53,7 +51,7 @@ usage() {
 # Options processing                                #
 #                                                   #
 #####################################################
-while getopts ":htm:crkn:" opt; do
+while getopts ":htm:crn:" opt; do
     case $opt in
         h)
             usage
@@ -71,9 +69,6 @@ while getopts ":htm:crkn:" opt; do
             ;;
         r)
             ROOT_RSYNC_BACKUP=1
-            ;;
-        k)
-            KODI_BACKUP=1
             ;;
         n)
             if [[ $OPTARG == +([0-9]) ]]; then
@@ -138,7 +133,6 @@ fi
 #####################################################
 [ $DRY_RUN = 1 ] && echo "Operation scheduled in dry-run (no-op):" || echo "Operations scheduled:"
 [ $ROOT_RSYNC_BACKUP = 1 ] && echo " - Root FS backup with rsync"
-[ $KODI_BACKUP = 1 ] && echo " - Kodi backups sync"
 [ $SEND_MAIL = 1 ] && echo " - Sending mail at the end to $MAIL"
 echo " - Cleaning up backup to kep at most $RETENTION_NUMBER backups"
 echo ""
@@ -192,7 +186,7 @@ if [ "${COPY_SSD_TO_HDD}" = 1 ]; then
         --acls --xattrs \
         --delete-before \
         --no-compress \
-        --verbose \
+        --quiet \
         --exclude 'saveMax/server_backup' \
         --exclude 'lost+found' \
         ${SRC_RSYNC_FOLDER} \
@@ -228,29 +222,6 @@ if [ "${ROOT_RSYNC_BACKUP}" = 1 ]; then
     
     FINISH="$(date +%s)"
     echo "Root backup total time: $(( (${FINISH}-${START})/3600 ))h $(( ((${FINISH}-${START})/60)%60 ))m $(( (${FINISH}-${START})%60 ))s"
-fi
-
-#############
-# Kodi Backup
-#############
-
-if [ "${KODI_BACKUP}" = 1 ]; then
-    START="$(date +%s)"
-    echo "--------------------------------"
-    echo "-> Kodi backup"
-
-    KODI_FOLDER="${CURRENT_FOLDER}/kodi_backup"
-    KODI_CP_COMMAND="mv /home/kodi/backups/* ${KODI_FOLDER}"
-
-    if [ "${DRY_RUN}" = 1 ]; then
-        echo "Would run \"${KODI_CP_COMMAND}\""
-    else
-        mkdir "${KODI_FOLDER}"
-        eval "$KODI_CP_COMMAND";
-    fi
-
-    FINISH="$(date +%s)"
-    echo "Kodi backup total time: $(( (${FINISH}-${START})/3600 ))h $(( ((${FINISH}-${START})/60)%60 ))m $(( (${FINISH}-${START})%60 ))s"
 fi
 
 # Final Log
