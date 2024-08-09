@@ -63,7 +63,7 @@ rsync-no-vanished \
     --one-file-system \
     --exclude "lost+found" \
     --exclude "tempDownloads" \
-    --exclude "saveMax/server_backup"
+    --exclude "saveMax/server_backup" \
     /media/disk/* \
     "${EXTERNAL_BACKUP_DISK_MOUNT_DIR}"
 
