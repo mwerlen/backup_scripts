@@ -94,12 +94,18 @@ done
 function mount_disk {
     echo "Montage du disque de sauvegarde interne"
     # d950c733-e582-40fb-930f-602f82c5d0e4 -> ../../sdb1 (le HDD interne)
+    hdparm -S 6 -B 1 /dev/disk/by-uuid/d950c733-e582-40fb-930f-602f82c5d0e4
     mount /dev/disk/by-uuid/d950c733-e582-40fb-930f-602f82c5d0e4 "${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
 }
 
 function unmount_disk {
     echo "Démontage du disque de sauvegarde interne"
     umount "${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
+    echo "Lancement d'un test du disque de savegarde interne"
+    smartctl -t short --captive /dev/sdb
+    sleep 300
+    # Arrêt du disque
+    hdparm -Y /dev/disk/by-uuid/d950c733-e582-40fb-930f-602f82c5d0e4
 }
 
 #####################################################
