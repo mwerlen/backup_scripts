@@ -26,7 +26,7 @@ BACKUP_NAME="backup_on_"
 DRY_RUN=0
 SEND_MAIL=0
 COPY_SSD_TO_HDD=0
-ROOT_RSYNC_BACKUP=0
+ROOT_TAR_BACKUP=0
 MAIL="root@server.werlen.fr"
 
 #####################################################
@@ -41,7 +41,7 @@ usage() {
     echo "      -t          Test run, no backup made"
     echo "      -m <mail>   Send mail to <mail> at the end"
     echo "      -c          Copy SSD media folder to internal HDD"
-    echo "      -r          Backup root system with rsync"
+    echo "      -r          Backup root system with tar"
     echo "      -n <number> Keep <number> backups (default: 5)"
 }
 
@@ -68,7 +68,7 @@ while getopts ":htm:crn:" opt; do
             COPY_SSD_TO_HDD=1
             ;;
         r)
-            ROOT_RSYNC_BACKUP=1
+            ROOT_TAR_BACKUP=1
             ;;
         n)
             if [[ $OPTARG == +([0-9]) ]]; then
@@ -99,6 +99,8 @@ function mount_disk {
 }
 
 function unmount_disk {
+    echo "Attente pour libérer les disques"
+    sleep 30
     echo "Démontage du disque de sauvegarde interne"
     umount "${INTERNAL_BACKUP_DISK_MOUNT_DIR}"
     echo "Lancement d'un test du disque de savegarde interne"
@@ -138,7 +140,7 @@ fi
 #                                                   #
 #####################################################
 [ $DRY_RUN = 1 ] && echo "Operation scheduled in dry-run (no-op):" || echo "Operations scheduled:"
-[ $ROOT_RSYNC_BACKUP = 1 ] && echo " - Root FS backup with rsync"
+[ $ROOT_TAR_BACKUP = 1 ] && echo " - Root FS backup with tar"
 [ $SEND_MAIL = 1 ] && echo " - Sending mail at the end to $MAIL"
 echo " - Cleaning up backup to kep at most $RETENTION_NUMBER backups"
 echo ""
@@ -208,22 +210,24 @@ if [ "${COPY_SSD_TO_HDD}" = 1 ]; then
     echo "SD backup total time: $(( (${FINISH}-${START})/3600 ))h $(( ((${FINISH}-${START})/60)%60 ))m $(( (${FINISH}-${START})%60 ))s"
 fi
 
-############
-# ROOT Rsync
-############
-if [ "${ROOT_RSYNC_BACKUP}" = 1 ]; then
+#################
+# ROOT TAR backup
+#################
+if [ "${ROOT_TAR_BACKUP}" = 1 ]; then
     START="$(date +%s)"
     echo "--------------------------------"
-    echo "-> Server backup with rsync..."
+    echo "-> Server backup with tar..."
     
-    ROOT_RSYNC_FOLDER="${CURRENT_FOLDER}/server"
-    ROOT_RSYNC_COMMAND="/usr/local/bin/rsync-no-vanished --quiet --archive --acls --xattrs --verbose /* ${ROOT_RSYNC_FOLDER} --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found --exclude /var/lib/lxcfs/cgroup --exclude /var/lib/lxcfs/proc"
+    OLD_PWD="$PWD"
+    ROOT_TAR_ARCHIVE="${CURRENT_FOLDER}/server_root.tar.gz"
+    ROOT_TAR_COMMAND="tar --create --file ${ROOT_TAR_ARCHIVE} --gzip --preserve-permissions --atime-preserve --same-owner --acls --xattrs --ignore-failed-read --verbose --one-file-system --exclude /dev/ --exclude /proc/ --exclude /sys/ --exclude /tmp/ --exclude /run/ --exclude /mnt/ --exclude /media/ --exclude /var/run/ --exclude /var/lock/ --exclude /var/tmp/ --exclude /var/lib/urandom/ --exclude /lost+found --exclude /var/lib/lxcfs/cgroup --exclude /var/lib/lxcfs/proc /"
 
     if [ "${DRY_RUN}" = 1 ]; then
-        echo "Would run \"${ROOT_RSYNC_COMMAND}\"";
+        echo "Would run \"${ROOT_TAR_COMMAND}\"";
     else
-        mkdir "${ROOT_RSYNC_FOLDER}"
-        eval "${ROOT_RSYNC_COMMAND}";
+        cd /
+        eval "${ROOT_TAR_COMMAND}";
+        cd "${OLD_PWD}"
     fi
     
     FINISH="$(date +%s)"
